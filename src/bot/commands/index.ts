@@ -1,1 +1,5 @@
-// TODO: Barrel file — export all slash commands as a collection
+import * as ping from "./ping.js";
+
+export const commands = new Map([
+  [ping.data.name, ping],
+])

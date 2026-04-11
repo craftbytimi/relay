@@ -25,7 +25,7 @@ export async function buildApplication(
   });
 
   // Routes
-  registerHealthRoutes(app);
+  registerHealthRoutes(app, env);
 
   return { app, env, logger };
 }
