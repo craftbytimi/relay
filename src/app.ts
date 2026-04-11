@@ -9,6 +9,8 @@ import { createLogger, type AppLogger } from "./utils/logger.js";
 import { createBot } from "./bot/client.js";
 import { registerReady } from "./bot/events/ready.js";
 import { registerInteractionCreate } from "./bot/events/interaction-create.js";
+import { registerGuildMemberAdd } from "./bot/events/relay-member-add.js";
+import { registerMessageCreate } from "./bot/events/message-create.js";
 import { registerCommands } from "./bot/register-commands.js";
 
 export interface BuiltApplication {
@@ -49,6 +51,8 @@ export async function startApplication(): Promise<BuiltApplication> {
     // Register event handlers
     registerReady(bot);
     registerInteractionCreate(bot);
+    registerGuildMemberAdd(bot);
+    registerMessageCreate(bot);
 
     // Register slash commands with Discord API
     await registerCommands(
