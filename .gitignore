@@ -22,7 +22,8 @@ RELAY_PROJECT_PLAN.md
 
 # Environment files
 .env
-.env.*
+.env.local
+.env.*.local
 .env.example
 
 # Local tooling

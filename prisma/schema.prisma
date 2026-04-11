@@ -1,0 +1,57 @@
+// =============================================================
+// Relay — Database Schema
+//
+// Defines the PostgreSQL data model for relays (servers), users,
+// and per-relay configuration settings.
+// =============================================================
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Relay ---
+// Represents a Discord server registered with Relay.
+model Relay {
+  id        String        @id
+  name      String
+  prefix    String        @default("!")
+  language  String        @default("en")
+  settings  RelaySetting?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@map("relays")
+}
+
+// --- User ---
+// A Discord user that has interacted with the bot.
+model User {
+  id            String   @id
+  username      String
+  discriminator String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("users")
+}
+
+// --- Relay Settings ---
+// Per-relay configuration: welcome messages, mod logs, etc.
+model RelaySetting {
+  id               String @id @default(cuid())
+  welcomeMessage   String @default("")
+  modLogChannelId  String @default("")
+  welcomeChannelId String @default("") @db.VarChar(2000)
+
+  relayId   String   @unique
+  relay     Relay    @relation(fields: [relayId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("relay_settings")
+}
