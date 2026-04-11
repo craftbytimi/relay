@@ -6,6 +6,10 @@ import { registerHealthRoutes } from "./routes/health.js";
 import { installShutdownHandlers } from "./utils/shutdown.js";
 import { loadEnv, type AppEnv } from "./config/env.js";
 import { createLogger, type AppLogger } from "./utils/logger.js";
+import { createBot } from "./bot/client.js";
+import { registerReady } from "./bot/events/ready.js";
+import { registerInteractionCreate } from "./bot/events/interaction-create.js";
+import { registerCommands } from "./bot/register-commands.js";
 
 export interface BuiltApplication {
   app: FastifyInstance;
@@ -37,6 +41,29 @@ export async function startApplication(): Promise<BuiltApplication> {
 
   await app.listen({ host: "0.0.0.0", port: env.PORT });
   logger.info({ port: env.PORT }, "Relay HTTP server started");
+
+  // Start Discord bot if token is configured
+  if (env.DISCORD_BOT_TOKEN && env.DISCORD_CLIENT_ID) {
+    const bot = createBot();
+
+    // Register event handlers
+    registerReady(bot);
+    registerInteractionCreate(bot);
+
+    // Register slash commands with Discord API
+    await registerCommands(
+      env.DISCORD_BOT_TOKEN,
+      env.DISCORD_CLIENT_ID,
+      env.DISCORD_GUILD_ID,
+    );
+
+    // Connect to Discord
+    await bot.login(env.DISCORD_BOT_TOKEN);
+
+    logger.info("Discord bot started");
+  } else {
+    logger.warn("DISCORD_BOT_TOKEN or DISCORD_CLIENT_ID not set — bot disabled");
+  }
 
   return { app, env, logger };
 }

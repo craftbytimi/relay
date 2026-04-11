@@ -80,7 +80,7 @@ export class ModerationController {
     };
 
     // TODO: save to database
-    // TODO: call Discord API to ban the user from the guild
+    // TODO: call Discord API to ban the user from the relay
 
     return ban;
   }
@@ -97,7 +97,7 @@ export class ModerationController {
     };
 
     // TODO: save to database
-    // TODO: call Discord API to kick the user from the guild
+    // TODO: call Discord API to kick the user from the relay
 
     return kick;
   }
