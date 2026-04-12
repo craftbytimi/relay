@@ -12,6 +12,7 @@ import { registerInteractionCreate } from "./bot/events/interaction-create.js";
 import { registerGuildMemberAdd } from "./bot/events/relay-member-add.js";
 import { registerMessageCreate } from "./bot/events/message-create.js";
 import { registerCommands } from "./bot/register-commands.js";
+import { ReminderScheduler } from "./jobs/reminders.scheduler.js";
 
 export interface BuiltApplication {
   app: FastifyInstance;
@@ -63,6 +64,10 @@ export async function startApplication(): Promise<BuiltApplication> {
 
     // Connect to Discord
     await bot.login(env.DISCORD_BOT_TOKEN);
+
+    // Start reminder scheduler
+    const scheduler = new ReminderScheduler(bot, logger);
+    scheduler.start();
 
     logger.info("Discord bot started");
   } else {

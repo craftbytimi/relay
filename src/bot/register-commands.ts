@@ -1,24 +1,23 @@
-
-import {REST, Routes} from "discord.js";  
+import { REST, Routes } from "discord.js";
 import { commands } from "./commands/index.js";
+import { createLogger } from "../utils/logger.js";
 
+const logger = createLogger({ LOG_LEVEL: "info", NODE_ENV: "development" });
 
 export async function registerCommands(token: string, clientId: string, guildId?: string) {
   const rest = new REST({ version: "10" }).setToken(token);
 
   const body = [...commands.values()].map((cmd) => cmd.data.toJSON());
 
-
-  try {    
+  try {
     if (guildId) {
       await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body });
-      console.log("Successfully registered application commands for guild " + guildId);
+      logger.info({ guildId }, "Registered application commands for guild");
     } else {
       await rest.put(Routes.applicationCommands(clientId), { body });
-      console.log("Successfully registered application commands globally");
+      logger.info("Registered application commands globally");
     }
-  } 
-  catch (error) {
-    console.error(error);
+  } catch (error) {
+    logger.error({ err: error }, "Failed to register application commands");
   }
 }

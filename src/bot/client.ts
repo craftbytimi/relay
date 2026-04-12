@@ -1,7 +1,9 @@
 import { Client, GatewayIntentBits } from "discord.js";
 
+let _bot: Client | null = null;
+
 export function createBot(): Client {
-  return new Client({
+  _bot = new Client({
     intents: [
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
@@ -9,4 +11,9 @@ export function createBot(): Client {
       GatewayIntentBits.MessageContent,
     ],
   });
+  return _bot;
+}
+
+export function getBot(): Client | null {
+  return _bot;
 }

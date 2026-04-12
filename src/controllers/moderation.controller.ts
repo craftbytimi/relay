@@ -1,127 +1,168 @@
-import { randomUUID } from "node:crypto";
-
-// --- Input Types ---
-
-interface WarnInput {
-  userId: string;
-  relayId: string;
-  reason: string;
-  moderatorId: string;
-}
-
-interface BanInput {
-  userId: string;
-  relayId: string;
-  reason: string;
-  moderatorId: string;
-}
-
-interface KickInput {
-  userId: string;
-  relayId: string;
-  reason: string;
-  moderatorId: string;
-}
-
-interface MuteInput {
-  userId: string;
-  relayId: string;
-  reason: string;
-  moderatorId: string;
-  duration: number; // in minutes
-}
-
-// --- Result Types ---
-
-interface ModerationResult {
-  id: string;
-  action: "warn" | "ban" | "kick" | "mute";
-  userId: string;
-  relayId: string;
-  reason: string;
-  moderatorId: string;
-  createdAt: Date;
-}
-
-interface MuteResult extends ModerationResult {
-  action: "mute";
-  duration: number;
-  expiresAt: Date;
-}
-
-// --- Controller ---
+import type { Guild } from "discord.js";
+import { getDb } from "../db/index.js";
+import type { ModerationResult, ModerationInput } from "../types/moderation.type.js";
 
 export class ModerationController {
-  async warnUser(input: WarnInput): Promise<ModerationResult> {
-    const warning: ModerationResult = {
-      id: randomUUID(),
-      action: "warn",
-      userId: input.userId,
-      relayId: input.relayId,
-      reason: input.reason,
-      moderatorId: input.moderatorId,
-      createdAt: new Date(),
-    };
-
-    // TODO: save to database
-
-    return warning;
+  private get db() {
+    return getDb();
   }
 
-  async banUser(input: BanInput): Promise<ModerationResult> {
-    const ban: ModerationResult = {
-      id: randomUUID(),
-      action: "ban",
-      userId: input.userId,
-      relayId: input.relayId,
-      reason: input.reason,
-      moderatorId: input.moderatorId,
-      createdAt: new Date(),
-    };
-
-    // TODO: save to database
-    // TODO: call Discord API to ban the user from the relay
-
-    return ban;
+  private async ensureUsers(userId: string, username: string, moderatorId: string, moderatorUsername: string) {
+    await this.db.user.upsert({
+      where: { id: userId },
+      create: { id: userId, username, discriminator: "0" },
+      update: { username },
+    });
+    await this.db.user.upsert({
+      where: { id: moderatorId },
+      create: { id: moderatorId, username: moderatorUsername, discriminator: "0" },
+      update: { username: moderatorUsername },
+    });
   }
 
-  async kickUser(input: KickInput): Promise<ModerationResult> {
-    const kick: ModerationResult = {
-      id: randomUUID(),
-      action: "kick",
-      userId: input.userId,
-      relayId: input.relayId,
-      reason: input.reason,
-      moderatorId: input.moderatorId,
-      createdAt: new Date(),
-    };
-
-    // TODO: save to database
-    // TODO: call Discord API to kick the user from the relay
-
-    return kick;
+  private async ensureRelay(relayId: string, relayName: string) {
+    await this.db.relay.upsert({
+      where: { id: relayId },
+      create: { id: relayId, name: relayName },
+      update: {},
+    });
   }
 
-  async muteUser(input: MuteInput): Promise<MuteResult> {
-    const now = new Date();
-    const expiresAt = new Date(now.getTime() + input.duration * 60_000);
+  async warnUser(input: ModerationInput): Promise<ModerationResult> {
+    await this.ensureRelay(input.relayId, input.relayName);
+    await this.ensureUsers(input.userId, input.username, input.moderatorId, input.moderatorUsername);
 
-    const mute: MuteResult = {
-      id: randomUUID(),
-      action: "mute",
-      userId: input.userId,
-      relayId: input.relayId,
-      reason: input.reason,
-      moderatorId: input.moderatorId,
+    const action = await this.db.moderationAction.create({
+      data: {
+        action: "WARN",
+        reason: input.reason,
+        userId: input.userId,
+        moderatorId: input.moderatorId,
+        relayId: input.relayId,
+      },
+    });
+
+    return {
+      id: action.id,
+      action: action.action,
+      reason: action.reason,
+      userId: action.userId,
+      moderatorId: action.moderatorId,
+      relayId: action.relayId,
+      createdAt: action.createdAt,
+    };
+  }
+
+  async banUser(input: ModerationInput, guild: Guild): Promise<ModerationResult> {
+    await this.ensureRelay(input.relayId, input.relayName);
+    await this.ensureUsers(input.userId, input.username, input.moderatorId, input.moderatorUsername);
+
+    // Execute Discord ban
+    await guild.members.ban(input.userId, { reason: input.reason });
+
+    const action = await this.db.moderationAction.create({
+      data: {
+        action: "BAN",
+        reason: input.reason,
+        userId: input.userId,
+        moderatorId: input.moderatorId,
+        relayId: input.relayId,
+      },
+    });
+
+    return {
+      id: action.id,
+      action: action.action,
+      reason: action.reason,
+      userId: action.userId,
+      moderatorId: action.moderatorId,
+      relayId: action.relayId,
+      createdAt: action.createdAt,
+    };
+  }
+
+  async kickUser(input: ModerationInput, guild: Guild): Promise<ModerationResult> {
+    await this.ensureRelay(input.relayId, input.relayName);
+    await this.ensureUsers(input.userId, input.username, input.moderatorId, input.moderatorUsername);
+
+    // Execute Discord kick
+    const member = await guild.members.fetch(input.userId);
+    await member.kick(input.reason);
+
+    const action = await this.db.moderationAction.create({
+      data: {
+        action: "KICK",
+        reason: input.reason,
+        userId: input.userId,
+        moderatorId: input.moderatorId,
+        relayId: input.relayId,
+      },
+    });
+
+    return {
+      id: action.id,
+      action: action.action,
+      reason: action.reason,
+      userId: action.userId,
+      moderatorId: action.moderatorId,
+      relayId: action.relayId,
+      createdAt: action.createdAt,
+    };
+  }
+
+  async muteUser(input: ModerationInput & { duration: number }, guild: Guild): Promise<ModerationResult> {
+    await this.ensureRelay(input.relayId, input.relayName);
+    await this.ensureUsers(input.userId, input.username, input.moderatorId, input.moderatorUsername);
+
+    // Execute Discord timeout
+    const member = await guild.members.fetch(input.userId);
+    await member.timeout(input.duration * 60_000, input.reason);
+
+    const action = await this.db.moderationAction.create({
+      data: {
+        action: "MUTE",
+        reason: input.reason,
+        duration: input.duration,
+        userId: input.userId,
+        moderatorId: input.moderatorId,
+        relayId: input.relayId,
+      },
+    });
+
+    return {
+      id: action.id,
+      action: action.action,
+      reason: action.reason,
       duration: input.duration,
-      createdAt: now,
-      expiresAt,
+      userId: action.userId,
+      moderatorId: action.moderatorId,
+      relayId: action.relayId,
+      createdAt: action.createdAt,
     };
+  }
 
-    // TODO: save to database
-    // TODO: call Discord API to timeout the user
+  async getHistory(userId: string, relayId: string, limit = 10): Promise<ModerationResult[]> {
+    const actions = await this.db.moderationAction.findMany({
+      where: { userId, relayId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
 
-    return mute;
+    return actions.map((a) => {
+      const result: ModerationResult = {
+        id: a.id,
+        action: a.action,
+        reason: a.reason,
+        userId: a.userId,
+        moderatorId: a.moderatorId,
+        relayId: a.relayId,
+        createdAt: a.createdAt,
+      };
+      if (a.duration != null) {
+        result.duration = a.duration;
+      }
+      return result;
+    });
   }
 }
 
